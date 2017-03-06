@@ -1,4 +1,20 @@
 #include <I2C.h>
+#include <Adafruit_TB6612.h>
+#include <Servo.h>
+
+Servo LidarTurret;  // create servo object to control a servo
+int turretPosition = 0;
+boolean spinningLeft = true;
+
+// TB6612 H-Bridge Pins
+#define AIN1 9
+#define BIN1 8
+#define AIN2 10
+#define BIN2 7
+#define PWMA 11
+#define PWMB 6
+
+
 
 // BN0055 specific registers
 #define    BN0055_ADDRESS   0x28          // Default I2C Address of BN0055.
@@ -20,17 +36,30 @@ boolean calibrated = false;
 #define    RegisterHighLowB    0x8f          // Register to get both High and Low bytes in 1 call.
 int distance = -1;  // lidar distance reading
 
+// these constants are used to allow you to make your motor configuration 
+// line up with function names like forward.  Value can be 1 or -1
+const int offsetA = 1;
+const int offsetB = 1;
+
+// Initializing motors. 
+Motor motor1 = Motor(AIN1, AIN2, PWMA, offsetA);
+Motor motor2 = Motor(BIN1, BIN2, PWMB, offsetB);
+
 void setup() {
   boolean debug = false;
   Serial.begin(9600);
+  pinMode(A3, OUTPUT);  // Power LED
+  digitalWrite(A3, HIGH);
   pinMode(12, OUTPUT);  // LED to indicate calibration status
   
   I2c.begin(); // Opens & joins the irc bus as master
   I2c.timeOut(50); // Sets a timeout to ensure no locking up of sketch if I2C communication fails
+
+  LidarTurret.attach(2);  // attaches the servo on pin 2 to the servo object
   
   if(BN0055setup(debug)) { Serial.println("Setup BN0055 Successful"); }
   if(BN0055useCrystal()) { Serial.println("BN0055 Using External Clock"); }
-  
+  while(readGyroCalibration() != 3) {}  // necessary to do this before the servo starts moving because the gyro needs to sit in peace to calibrate
 }
 
 
@@ -40,8 +69,10 @@ void loop() {
   Serial.print("  ");
   BN0055getCalibration();
   Serial.print("  ");
-  if(calibrated) digitalWrite(12, HIGH);
-  else digitalWrite(12, LOW);
+  LidarTurret.write(turretPosition);
+  spinningLeft ? turretPosition+=3 : turretPosition-=3;
+  if(turretPosition > 180) spinningLeft = false;
+  if(turretPosition < 0) spinningLeft = true;
   readLidar();
   delay(100);
 }
@@ -159,7 +190,8 @@ void BN0055getCalibration()
   reading = (value >> 6) & 0x03;
   Serial.print("    System: ");
   Serial.print(reading);
-  if(reading == 3) calibrated = true;
+  if(reading == 3) digitalWrite(12, HIGH);
+  else digitalWrite(12, LOW);
   reading = (value >> 4) & 0x03;
   Serial.print(" Gyro: ");
   Serial.print(reading);
@@ -171,6 +203,14 @@ void BN0055getCalibration()
   Serial.print(reading);
 }
 
+byte readGyroCalibration()
+{
+  value = -100;
+  byte reading;
+  i2cRead(BN0055_ADDRESS, 0x35, 1, &value);
+  reading = (value >> 4) & 0x03;
+  return reading;
+}
 
 uint8_t i2cWrite(byte address, byte memoryRegister, byte value)
 {

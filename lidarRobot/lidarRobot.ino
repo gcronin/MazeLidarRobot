@@ -2,14 +2,13 @@
 #include <Servo.h>
 #include <I2C.h>
 
-// Pins for all inputs, keep in mind the PWM defines must be on PWM pins
-// the default pins listed are the ones used on the Redbot (ROB-12097)
-#define PWMA 3
-#define AIN2 2
-#define AIN1 4
-#define BIN1 7
-#define BIN2 6
-#define PWMB 5
+// TB6612 pins
+#define AIN1 9
+#define BIN1 8
+#define AIN2 10
+#define BIN2 7
+#define PWMA 11
+#define PWMB 6
 
 
 
@@ -25,7 +24,7 @@ int distance = -1;  // lidar distance reading
 
 void setup() {
   Serial.begin(9600);
-  LidarTurret.attach(12);  // attaches the servo on pin 12 to the servo object
+  LidarTurret.attach(2);  // attaches the servo on pin 2 to the servo object
   I2c.begin(); // Opens & joins the irc bus as master
   delay(100); // Waits to make sure everything is powered up before sending or receiving data  
   I2c.timeOut(50); // Sets a timeout to ensure no locking up of sketch if I2C communication fails
